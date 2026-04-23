@@ -4,6 +4,6 @@
 location            = "westeurope"
 resource_group_name = "RG-WBER-EUW"
 admin_username      = "azureuser"
-ssh_pub_key         = "ssh-rsa AAAA... ta_cle_publique_ici"
+ssh_pub_key         = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC5hDlOyY50kNrgG+TMzer1nIcPk1ly3Zv8pxYOEsIxoTCp0zmEdvGiVbMMIMUvF0YpHmKeZ7aJ7a9N584/swKCgDF7pjOyUs9Q5ChRGBmfh6cH1R9+vczA1VGcjxkJvPGPiKE23qK27WZF/zfaWnPfTzB6pbAp7XNhUUBLOVFr81xGFfVKjxRwNR51Zrl5EaiGs21WjT05yCZ8mpMGxmDIu4e0BC30Kbp3DoqVL+s2MnqPJVqH4ucUwEqY1a5cYTPJXVXuAl9t0qgYBMJvL8oBKxTxky1G6VVNaq72ud80tcmrkwwgbcUTGyw4PasFvwgKUKeucftUGgzE0IZyCpwCLuTNKB/bQt0FphKM1zU2zEIHy2kmkzXiAx4z3hwX4VT0C5YZIv/+WmOFWlG9v4nIS+/f9d0KgO1f53d9HQZ59HloJ/jrjNnyNynE0UTvULznDuY/f5JPmjnd1EG06wayFCvcAazluHxdKxcR0d9ct+YbowMVSK+8l2QMXhLQo32JOrSnDDyKhWiNL5Ke7oR0+1/QpOebvmr9yQEdTZRrUM9tKfESlrcHK5K2/dJh8VoyEmINuQhO/ta83tmAZgaNCDgr9u5+e5IBUf8P1kaHXXg9cmTqGfldAa9QyFzPuYSKyf1SHW0yX2tRXFRh2m+bUMFZPxZ0xZXRTW+elOaF0w== titouan@SandboxHost-639125259399517411"
 vm_size_control_plane = "Standard_B2s"
 vm_size_worker        = "Standard_B2s"
