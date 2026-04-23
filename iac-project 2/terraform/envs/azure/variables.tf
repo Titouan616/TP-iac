@@ -7,7 +7,7 @@ variable "location" {
 variable "resource_group_name" {
   description = "Resource Group existant dans Azure"
   type        = string
-  default     = "RG-WBER-EUW"
+  default     = "RG-TFAU-EUW"
 }
 
 variable "admin_username" {
