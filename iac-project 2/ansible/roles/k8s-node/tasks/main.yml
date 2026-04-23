@@ -1,0 +1,171 @@
+---
+# ── Installation containerd ────────────────────────────────────────────────────
+- name: Installer les dépendances containerd
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+  tags: containerd
+
+- name: Installer containerd
+  apt:
+    name: containerd
+    state: present
+  tags: containerd
+
+- name: Créer le répertoire de config containerd
+  file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+  tags: containerd
+
+- name: Générer la config par défaut de containerd
+  shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+  tags: containerd
+
+- name: Activer SystemdCgroup dans containerd
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+  notify: restart containerd
+  tags: containerd
+
+- name: Activer et démarrer containerd
+  systemd:
+    name: containerd
+    enabled: yes
+    state: started
+  tags: containerd
+
+# ── Installation kubeadm / kubelet / kubectl ──────────────────────────────────
+- name: Créer le répertoire keyrings
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  tags: kubernetes
+
+- name: Télécharger la clé GPG Kubernetes
+  shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/deb/Release.key \
+    | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  tags: kubernetes
+
+- name: Ajouter le dépôt Kubernetes
+  copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    content: |
+      deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/deb/ /
+  tags: kubernetes
+
+- name: Installer kubeadm, kubelet, kubectl
+  apt:
+    name:
+      - "kubelet={{ k8s_pkg_version }}"
+      - "kubeadm={{ k8s_pkg_version }}"
+      - "kubectl={{ k8s_pkg_version }}"
+    state: present
+    update_cache: yes
+  tags: kubernetes
+
+- name: Marquer les paquets kubernetes en hold
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+  tags: kubernetes
+
+- name: Activer et démarrer kubelet
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+  tags: kubernetes
+
+# ── Bootstrap control plane ───────────────────────────────────────────────────
+- name: Vérifier si le cluster est déjà initialisé
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: k8s_initialized
+  when: inventory_hostname in groups['control_plane']
+  tags: bootstrap
+
+- name: Initialiser le control plane avec kubeadm
+  command: >
+    kubeadm init
+    --pod-network-cidr={{ pod_network_cidr }}
+    --apiserver-advertise-address={{ ansible_host }}
+  when:
+    - inventory_hostname in groups['control_plane']
+    - not k8s_initialized.stat.exists
+  tags: bootstrap
+
+- name: Créer le répertoire .kube pour l'utilisateur admin
+  file:
+    path: "/home/{{ admin_user }}/.kube"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0755'
+  when: inventory_hostname in groups['control_plane']
+  tags: bootstrap
+
+- name: Copier le kubeconfig admin
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ admin_user }}/.kube/config"
+    remote_src: yes
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0600'
+  when: inventory_hostname in groups['control_plane']
+  tags: bootstrap
+
+- name: Installer le CNI Flannel
+  become_user: "{{ admin_user }}"
+  command: kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+  when:
+    - inventory_hostname in groups['control_plane']
+    - not k8s_initialized.stat.exists
+  tags: bootstrap
+
+- name: Récupérer la commande kubeadm join
+  command: kubeadm token create --print-join-command
+  when: inventory_hostname in groups['control_plane']
+  register: join_command
+  changed_when: false
+  tags: bootstrap
+
+- name: Stocker la commande join comme fact global
+  set_fact:
+    k8s_join_command: "{{ join_command.stdout }}"
+  when: inventory_hostname in groups['control_plane']
+  tags: bootstrap
+
+# ── Join workers ──────────────────────────────────────────────────────────────
+- name: Vérifier si le worker a déjà rejoint le cluster
+  stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: worker_joined
+  when: inventory_hostname in groups['workers']
+  tags: join
+
+- name: Joindre le cluster (workers)
+  command: "{{ hostvars[groups['control_plane'][0]]['k8s_join_command'] }}"
+  when:
+    - inventory_hostname in groups['workers']
+    - not worker_joined.stat.exists
+  tags: join

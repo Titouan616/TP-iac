@@ -1,0 +1,99 @@
+---
+- name: Mise à jour des paquets
+  apt:
+    update_cache: yes
+    upgrade: dist
+  tags: update
+
+- name: Désactiver le login root SSH
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin no'
+  notify: restart sshd
+  tags: ssh
+
+- name: Désactiver l'authentification par mot de passe SSH
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication no'
+  notify: restart sshd
+  tags: ssh
+
+- name: Installer fail2ban et auditd
+  apt:
+    name:
+      - fail2ban
+      - auditd
+      - audispd-plugins
+    state: present
+  tags: security
+
+- name: Configurer fail2ban pour SSH
+  copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime  = {{ fail2ban_bantime }}
+      findtime = 600
+      maxretry = {{ fail2ban_maxretry }}
+
+      [sshd]
+      enabled  = true
+      port     = {{ ssh_port }}
+      logpath  = %(sshd_log)s
+      backend  = %(sshd_backend)s
+  notify: restart fail2ban
+  tags: security
+
+- name: Activer fail2ban et auditd
+  systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  loop:
+    - fail2ban
+    - auditd
+  tags: security
+
+- name: Désactiver le swap (requis pour Kubernetes)
+  command: swapoff -a
+  changed_when: false
+  tags: k8s_prereq
+
+- name: Désactiver le swap dans /etc/fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+  tags: k8s_prereq
+
+- name: Charger les modules kernel overlay et br_netfilter
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+  tags: k8s_prereq
+
+- name: Persister les modules kernel au démarrage
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+  tags: k8s_prereq
+
+- name: Configurer les paramètres sysctl pour Kubernetes
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { key: 'net.bridge.bridge-nf-call-iptables',  value: '1' }
+    - { key: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+    - { key: 'net.ipv4.ip_forward',                 value: '1' }
+  tags: k8s_prereq

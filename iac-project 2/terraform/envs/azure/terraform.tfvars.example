@@ -1,0 +1,9 @@
+# Copier en terraform.tfvars et remplir
+# terraform.tfvars est dans .gitignore — ne jamais committer
+
+location            = "westeurope"
+resource_group_name = "RG-WBER-EUW"
+admin_username      = "azureuser"
+ssh_pub_key         = "ssh-rsa AAAA... ta_cle_publique_ici"
+vm_size_control_plane = "Standard_B2s"
+vm_size_worker        = "Standard_B2s"

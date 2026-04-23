@@ -1,0 +1,18 @@
+---
+# Playbook principal - appliqué sur tout le cluster
+# Usage : ansible-playbook -i inventory/hosts.ini playbooks/site.yml
+
+- name: "Phase 1 - Hardening OS + prérequis Kubernetes"
+  hosts: k8s_cluster
+  become: yes
+  roles:
+    - hardening
+
+- name: "Phase 2 - Installation et bootstrap Kubernetes"
+  hosts: k8s_cluster
+  become: yes
+  serial:
+    - "{{ groups['control_plane'] | length }}"  # control plane en premier
+    - "100%"                                     # workers ensuite
+  roles:
+    - k8s-node
