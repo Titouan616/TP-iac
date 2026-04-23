@@ -1,5 +1,0 @@
----
-k8s_version: "1.30"
-k8s_pkg_version: "1.30.*"
-pod_network_cidr: "10.244.0.0/16"
-admin_user: "azureuser"
